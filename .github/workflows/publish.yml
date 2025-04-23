@@ -1,0 +1,54 @@
+name: "PyPI Publishing Workflow"
+
+# Trigger on either:
+# 1. Push to v3-dev branch (for TestPyPI)
+# 2. Tags starting with v3 (for real PyPI)
+on:
+  push:
+    branches:
+      - "v3-dev"
+    tags:
+      - 'v3*'  # This will match only tags starting with v3
+
+jobs:
+  publish-package:
+    name: "Build and Publish Python Package"
+    runs-on: ubuntu-latest
+    
+    # Set the environment based on what triggered the workflow
+    environment:
+      name: ${{ contains(github.ref, 'refs/tags/v3') && 'pypi' || 'testpypi' }}
+    
+    permissions:
+      # Required for trusted publisher authentication
+      id-token: write
+    
+    steps:
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@v5
+      
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get full history with tags
+      
+      - name: "Build package artifacts"
+        run: uv build
+      
+      # Logic for TestPyPI (on v3-dev branch push)
+      - name: "Publish to TestPyPI"
+        if: ${{ !contains(github.ref, 'refs/tags/v3') }}
+        run: uv publish --index test
+      
+      - name: "Verify TestPyPI package installation"
+        if: ${{ !contains(github.ref, 'refs/tags/v3') }}
+        run: uv run --index test --with specklepy --no-project -- python -c "import specklepy"
+      
+      # Logic for PyPI (on v3* tag creation)
+      - name: "Publish to PyPI"
+        if: ${{ contains(github.ref, 'refs/tags/v3') }}
+        run: uv publish
+      
+      - name: "Verify PyPI package installation"
+        if: ${{ contains(github.ref, 'refs/tags/v3') }}
+        run: uv run --with specklepy --no-project -- python -c "import specklepy"
