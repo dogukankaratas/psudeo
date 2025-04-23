@@ -1,8 +1,4 @@
 name: "PyPI Publishing Workflow"
-
-# Trigger on either:
-# 1. Push to v3-dev branch (for TestPyPI)
-# 2. Tags starting with v3 (for real PyPI)
 on:
   workflow_run:
     workflows: ["Test CI Trigger"]  # This must match the name in test.yml
@@ -11,18 +7,28 @@ on:
 
 jobs:
   publish-package:
+    # Only run if the workflow_run event concluded successfully or this is a tag push
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v3'))
     name: "Build and Publish Python Package"
     runs-on: ubuntu-latest
     
     # Set the environment based on what triggered the workflow
     environment:
-      name: ${{ contains(github.ref, 'refs/tags/v3') && 'pypi' || 'testpypi' }}
+      name: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v3') && 'pypi' || 'testpypi' }}
     
     permissions:
       # Required for trusted publisher authentication
       id-token: write
     
     steps:
+      - name: "Debug info"
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
+      
       - name: "Install uv"
         uses: astral-sh/setup-uv@v5
       
@@ -34,20 +40,20 @@ jobs:
       - name: "Build package artifacts"
         run: uv build
       
-      # Logic for TestPyPI (on v3-dev branch push)
+      # Logic for TestPyPI (on v3-dev branch push through workflow_run)
       - name: "Publish to TestPyPI"
-        if: ${{ !contains(github.ref, 'refs/tags/v3') }}
+        if: ${{ github.event_name == 'workflow_run' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v3')) }}
         run: uv publish --index test
       
       - name: "Verify TestPyPI package installation"
-        if: ${{ !contains(github.ref, 'refs/tags/v3') }}
+        if: ${{ github.event_name == 'workflow_run' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v3')) }}
         run: uv run --index test --with specklepy --no-project -- python -c "import specklepy"
       
       # Logic for PyPI (on v3* tag creation)
       - name: "Publish to PyPI"
-        if: ${{ contains(github.ref, 'refs/tags/v3') }}
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v3') }}
         run: uv publish
       
       - name: "Verify PyPI package installation"
-        if: ${{ contains(github.ref, 'refs/tags/v3') }}
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v3') }}
         run: uv run --with specklepy --no-project -- python -c "import specklepy"
