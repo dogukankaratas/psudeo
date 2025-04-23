@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - "v3-dev"
+    tags:
+      - 'v3*'
   workflow_dispatch:  
 
 jobs:
