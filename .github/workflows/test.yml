@@ -1,0 +1,26 @@
+name: "Test CI Trigger"
+on:
+  push:
+    branches:
+      - "v3-dev"
+  workflow_dispatch:  
+
+jobs:
+  test-ci:
+    name: minimal-ci-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.10"
+      
+      - name: Run minimal check
+        run: |
+          echo "Running a minimal CI test"
+          uv sync
+          
+      - name: Complete workflow successfully
+        run: echo "CI workflow completed, publish workflow should trigger automatically"
