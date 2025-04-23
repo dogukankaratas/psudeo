@@ -4,11 +4,10 @@ name: "PyPI Publishing Workflow"
 # 1. Push to v3-dev branch (for TestPyPI)
 # 2. Tags starting with v3 (for real PyPI)
 on:
-  push:
-    branches:
-      - "v3-dev"
-    tags:
-      - 'v3*'  # This will match only tags starting with v3
+  workflow_run:
+    workflows: ["Test CI Trigger"]  # This must match the name in test.yml
+    types:
+      - completed
 
 jobs:
   publish-package:
